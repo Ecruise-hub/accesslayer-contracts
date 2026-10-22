@@ -4807,3 +4807,88 @@ pub struct BootstrapEndedEvent {
 pub fn bootstrap_ended_topics(key_id: &Address) -> (Symbol, Address) {
     (BOOTSTRAP_ENDED_EVENT_NAME, key_id.clone())
 }
+
+// ============================================================================
+// Subscription tiers
+// ============================================================================
+
+/// Event name emitted when a creator defines or updates a subscription tier.
+pub const TIER_CREATED_EVENT_NAME: Symbol = symbol_short!("tier_new");
+
+/// Stable field order for tier-created event payloads.
+pub const TIER_CREATED_DATA_FIELDS: [&str; 5] = [
+    "key_id",
+    "tier_id",
+    "fee_per_period",
+    "period_seconds",
+    "label",
+];
+
+/// Stable tier-created event payload for downstream indexers.
+///
+/// Event shape:
+/// - topics: `(TIER_CREATED_EVENT_NAME, key_id, tier_id)`
+/// - data: `TierCreatedEvent`
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[contracttype]
+pub struct TierCreatedEvent {
+    /// Creator key the tier belongs to.
+    pub key_id: Address,
+    /// Tier identifier, scoped to the key.
+    pub tier_id: u32,
+    /// Fee charged per subscription period, in stroops.
+    pub fee_per_period: i128,
+    /// Length of one subscription period, in seconds.
+    pub period_seconds: u64,
+    /// Human-readable tier label.
+    pub label: String,
+}
+
+/// Shared tier-created event topics tuple.
+pub fn tier_created_topics(key_id: &Address, tier_id: u32) -> (Symbol, Address, u32) {
+    (TIER_CREATED_EVENT_NAME, key_id.clone(), tier_id)
+}
+
+/// Event name emitted when a wallet subscribes to (or renews) a tier.
+pub const SUBSCRIBED_EVENT_NAME: Symbol = symbol_short!("subscribed");
+
+/// Stable field order for subscribed event payloads.
+pub const SUBSCRIBED_DATA_FIELDS: [&str; 6] = [
+    "key_id",
+    "tier_id",
+    "subscriber",
+    "fee_paid",
+    "expires_at",
+    "renewal",
+];
+
+/// Stable subscribed event payload for downstream indexers.
+///
+/// Event shape:
+/// - topics: `(SUBSCRIBED_EVENT_NAME, key_id, subscriber)`
+/// - data: `SubscribedEvent`
+///
+/// `renewal` is `true` when the subscription extended an existing active
+/// window (expiry is computed from `max(now, current_expiry)`) and `false`
+/// for a fresh subscription.
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[contracttype]
+pub struct SubscribedEvent {
+    /// Creator key the subscription is for.
+    pub key_id: Address,
+    /// Tier the wallet subscribed to.
+    pub tier_id: u32,
+    /// Wallet that paid for the subscription.
+    pub subscriber: Address,
+    /// Fee transferred to the creator earnings ledger.
+    pub fee_paid: i128,
+    /// Unix timestamp at which the subscription expires.
+    pub expires_at: u64,
+    /// Whether this call extended an existing active subscription.
+    pub renewal: bool,
+}
+
+/// Shared subscribed event topics tuple.
+pub fn subscribed_topics(key_id: &Address, subscriber: &Address) -> (Symbol, Address, Address) {
+    (SUBSCRIBED_EVENT_NAME, key_id.clone(), subscriber.clone())
+}
