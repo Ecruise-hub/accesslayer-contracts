@@ -1,5 +1,5 @@
 use crate::ContractError;
-use sorban_sdk::{contracttype, symbol_short, Address, Env, Symbol};
+use soroban_sdk::{contracttype, symbol_short, Address, Env, Symbol};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[contracttype]
@@ -44,7 +44,7 @@ pub struct PaymentAssetConfig {
     pub is_enabled: bool,
 }
 
-#[Clone]
+#[derive(Clone, Debug, Eq, PartialEq)]
 #[contracttype]
 pub enum EmdevelopaDataKey {
     CurveMigration(Address),
@@ -245,7 +245,7 @@ pub fn subscribe(
     let sub_key = EmdevelopaDataKey::TierSub(key_id.clone(), wallet.clone(), tier_id.clone());
 
     let existing: Option<TierSubscription> = env.storage().instance().get(&sub_key);
-    let base = match existing {
+    let base = match &existing {
         Some(prev) if prev.expires_at > now => prev.expires_at,
         _ => now,
     };
@@ -253,16 +253,12 @@ pub fn subscribe(
 
     // Transfer the tier fee from the subscriber to the key creator.
     if tier.fee_per_period > 0 {
-        let token = soroban_sdk::tokens::token::Client::new(env, payment_token);
+        let token = soroban_sdk::token::Client::new(env, payment_token);
         token.transfer(wallet, key_id, &tier.fee_per_period);
 
         // Credit the creator earnings ledger.
         let earnings_key = EmdevelopaDataKey::CreatorEarnings(key_id.clone());
-        let current: i128 = env
-            .storage()
-            .instance()
-            .get(&earnings_key)
-            .unwrap_or(0);
+        let current: i128 = env.storage().instance().get(&earnings_key).unwrap_or(0);
         env.storage()
             .instance()
             .set(&earnings_key, &(current + tier.fee_per_period));
@@ -279,10 +275,8 @@ pub fn subscribe(
     } else {
         SUBSCRIPTION_GRANTED_EVENT
     };
-    env.events().publish(
-        (event, key_id.clone(), wallet.clone(), tier_id),
-        expires_at,
-    );
+    env.events()
+        .publish((event, key_id.clone(), wallet.clone(), tier_id), expires_at);
 
     Ok(expires_at)
 }
@@ -290,7 +284,11 @@ pub fn subscribe(
 /// Returns true only within the active subscription window for the given tier.
 pub fn is_tier_subscribed(env: &Env, key_id: &Address, wallet: &Address, tier_id: Symbol) -> bool {
     let sub_key = EmdevelopaDataKey::TierSub(key_id.clone(), wallet.clone(), tier_id);
-    if let Some(sub) = env.storage().instance().get::<_, TierSubscription>(&sub_key) {
+    if let Some(sub) = env
+        .storage()
+        .instance()
+        .get::<_, TierSubscription>(&sub_key)
+    {
         return sub.is_active && env.ledger().timestamp() < sub.expires_at;
     }
     false
